@@ -228,6 +228,44 @@ Just like the previous question, you are asked to identify what is the most repr
 
 ```{r}
 
+library(data.table)
+
+# Assuming merged_data is your merged dataset
+# Remove rows with missing STATE (if any)
+dt <- merged_data[!is.na(STATE)]
+
+# 1. Summarize each station (within each state) by taking the median of the variables.
+#    (We also extract the station's latitude; if the station is fixed, the latitude should be the same in all rows.)
+station_summary <- dt[, .(
+  st_temp = quantile(temp, probs = 0.5, na.rm = TRUE),
+  st_wind = quantile(wind.sp, probs = 0.5, na.rm = TRUE),
+  st_atm  = quantile(atm.press, probs = 0.5, na.rm = TRUE),
+  lat = unique(lat)[1]  # Assumes each station has a unique, fixed latitude.
+), by = .(STATE, USAFID)]
+
+# 2. Compute state-level medians (across all observations for the state)
+state_medians <- dt[, .(
+  med_temp = quantile(temp, probs = 0.5, na.rm = TRUE),
+  med_wind = quantile(wind.sp, probs = 0.5, na.rm = TRUE),
+  med_atm  = quantile(atm.press, probs = 0.5, na.rm = TRUE)
+), by = STATE]
+
+# 3. Merge the station summaries with the state medians by STATE
+station_summary <- merge(station_summary, state_medians, by = "STATE")
+
+# 4. Calculate the Euclidean distance from each station's medians to the state medians
+station_summary[, dist := sqrt((st_temp - med_temp)^2 +
+                               (st_wind - med_wind)^2 +
+                               (st_atm  - med_atm)^2)]
+
+# 5. For each state, select the station with the smallest distance.
+#    In case of ties, order by the latitude (lowest latitude selected)
+representative_station <- station_summary[order(dist, lat), .SD[1], by = STATE]
+
+# Check the result
+print(representative_station)
+
+
 ```
 
 Knit the doc and save it on GitHub.
