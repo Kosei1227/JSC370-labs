@@ -352,6 +352,28 @@ Start by computing the states' average temperature. Use that measurement to clas
 - High: temp >= 25
 
 ```{r}
+library(data.table)
+
+# Assuming merged_data is your merged data.table which contains columns:
+# STATE, USAFID, temp, wind.sp, atm.press, etc.
+
+# Step 1: Compute state-level aggregates
+state_agg <- merged_data[, .(
+  avg_temp   = mean(temp, na.rm = TRUE),
+  avg_wind   = mean(wind.sp, na.rm = TRUE),
+  avg_atm    = mean(atm.press, na.rm = TRUE),
+  n_entries  = .N,                      # total number of records in the state
+  n_NA_temp  = sum(is.na(temp)),         # number of missing temperature values
+  n_stations = uniqueN(USAFID)           # count of unique stations
+), by = STATE]
+
+# Step 2: Create the "average temperature level" classification for each state.
+# low: avg_temp < 20, Mid: 20 <= avg_temp < 25, High: avg_temp >= 25
+state_agg[, temp_level := fifelse(avg_temp < 20, "low",
+                           fifelse(avg_temp < 25, "Mid", "High"))]
+
+print(state_agg)
+
 
 ```
 
@@ -366,6 +388,19 @@ Once you are done with that, you can compute the following:
 All by the levels described before.
 
 ```{r}
+# Step 3: Create a summary table aggregated by temp_level.
+summary_table <- state_agg[, .(
+  num_states       = .N,                       # number of states in this group
+  total_entries    = sum(n_entries),           # total number of records across these states
+  total_NA_temp    = sum(n_NA_temp),           # total number of missing temp entries
+  total_stations   = sum(n_stations),          # total number of stations (note: stations are counted per state)
+  mean_temperature = mean(avg_temp),           # average of state-average temperatures
+  mean_wind        = mean(avg_wind),           # average of state-average wind speeds
+  mean_atm         = mean(avg_atm)             # average of state-average atmospheric pressures
+), by = temp_level]
+
+# Display the summary table
+summary_table
 
 ```
 
