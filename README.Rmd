@@ -240,8 +240,10 @@ station_summary <- dt[, .(
   st_temp = quantile(temp, probs = 0.5, na.rm = TRUE),
   st_wind = quantile(wind.sp, probs = 0.5, na.rm = TRUE),
   st_atm  = quantile(atm.press, probs = 0.5, na.rm = TRUE),
-  lat = unique(lat)[1]  # Assumes each station has a unique, fixed latitude.
+  lat = unique(lat)[1],
+  lon = unique(lon)[1]   # Make sure to include lon
 ), by = .(STATE, USAFID)]
+
 
 # 2. Compute state-level medians (across all observations for the state)
 state_medians <- dt[, .(
@@ -274,7 +276,66 @@ Knit the doc and save it on GitHub.
 
 For each state, identify what is the station that is closest to the mid-point of the state. Combining these with the stations you identified in the previous question, use `leaflet()` to visualize all ~100 points in the same figure, applying different colors for those identified in this question.
 
+
+
 ```{r}
+library(data.table)
+library(leaflet)
+library(dplyr)
+## --- Step 1: Extract Unique Station Info ---
+# Get one row per station (using the station information provided in merged_data)
+station_info <- unique(merged_data[, .(STATE, USAFID, lat, lon)])
+
+## --- Step 2: Compute State Centroids ---
+# For each state, compute the average (mean) of lat and lon
+state_centroid <- station_info[, .(
+  centroid_lat = mean(lat, na.rm = TRUE),
+  centroid_lon = mean(lon, na.rm = TRUE)
+), by = STATE]
+
+## --- Step 3: Find the Station Closest to the Mid-Point ---
+# Merge the station info with its state's centroid
+station_info <- merge(station_info, state_centroid, by = "STATE")
+
+# Compute Euclidean distance from each station to its state's centroid.
+# (Note: This is a rough approximation since lat/lon are degrees.)
+station_info[, dist := sqrt((lat - centroid_lat)^2 + (lon - centroid_lon)^2)]
+
+# For each state, choose the station with the smallest distance.
+# In the event of ties, order by the lowest latitude.
+mid_stations <- station_info[order(dist, lat), .SD[1], by = STATE]
+
+## --- Step 4: Plot Using leaflet() ---
+
+# Create the base map.
+map <- leaflet() %>% addTiles()
+
+# Add markers for the representative stations (blue)
+map <- map %>% addCircleMarkers(data = representative_station,
+                                lat = ~lat,
+                                lng = ~lon,
+                                color = "blue",
+                                radius = 5,
+                                label = ~paste("Rep Station:", USAFID, "<br>State:", STATE),
+                                group = "Representative")
+
+# Add markers for the mid-point stations (red)
+map <- map %>% addCircleMarkers(data = mid_stations,
+                                lat = ~lat,
+                                lng = ~lon,
+                                color = "red",
+                                radius = 5,
+                                label = ~paste("Mid Station:", USAFID, "<br>State:", STATE),
+                                group = "Mid-Point")
+
+# Optional: add layer controls
+map <- map %>% addLayersControl(
+  overlayGroups = c("Representative", "Mid-Point"),
+  options = layersControlOptions(collapsed = FALSE)
+)
+
+# Display the map.
+map
 
 ```
 
