@@ -70,17 +70,32 @@ The parameters passed to the query are documented [here](https://www.ncbi.nlm.ni
 ```{r papers-covid-toronto, eval=FALSE}
 library(httr)
 query_ids <- GET(
-  url   = "BASELINE URL",
-  query = list("QUERY PARAMETERS")
+  url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+  query = list(
+    db = "pubmed",
+    term = "h5n1 toronto",
+    retmax = 1000
+  )
 )
 
 # Extracting the content of the response of GET
 ids <- httr::content(query_ids)
+
+print(ids)
 ```
 
 The query will return an XML object, we can turn it into a character list to
 analyze the text directly with `as.character()`. Another way of processing the
 data could be using lists with the function `xml2::as_list()`. We will skip the latter for now.
+
+```{r}
+ids_text <- as.character(ids)
+
+# Print the first few lines
+cat(substr(ids_text, 1, 500))
+
+
+```
 
 Take a look at the data, and continue with the next question (don't forget to 
 commit and push your results to your GitHub repo!).
